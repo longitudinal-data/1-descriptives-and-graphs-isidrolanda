@@ -1,0 +1,112 @@
+---
+title: "Landa-ALDA assignment 2"
+author: "Isidro Landa"
+date: "September 13, 2017"
+output: pdf_document
+---
+
+# Packages used
+```{r}
+library(lme4)
+library(tidyverse)
+library(haven)
+library(sjPlot)
+library(ggthemes)
+library(broom)
+library(merTools)
+
+```
+
+# Load data
+```{r}
+## Set working directory
+setwd("C:/Users/Isidro/OneDrive/WUSTL/Coursework/F17/ALDA")
+
+long <- read_sav("Landa-CC daily diary.sav")
+```
+
+
+# Basic regression
+```{r}
+regr.1 <- lm(er.avoid ~ day0, long)
+summary(regr.1)
+```
+
+
+Probelms 1 - 4
+# Intercept only model
+  - Unconditional means model
+```{r}
+
+# Random (intercept) effect
+mod.1 <- lmer(er.avoid ~ 1 + (1 | id), data = long)
+summary(mod.1)
+
+intercept_variance <- .4393
+residual_variance <- .5450
+icc <- intercept_variance/(intercept_variance + residual_variance)
+
+icc
+
+# Plotting random effects of intercept
+sjp.lmer(mod.1, facet.grid = F, sort = "sort.all")
+```
+## There are mean differences in how much people avoid on day 1. ICC = .45 meaning that just under less than half of the variance is attributable to between person variation. 
+
+# Extracting fitted information
+```{r}
+# head(ranef(mod.2))
+# fixef(mod.2)
+# aug_scores <- augment(mod.2, data = long)
+```
+
+
+# Adding time
+  - Unconditional growth model
+```{r}
+
+mod.2f <- lmer(er.avoid ~ 1 + day0 + (1 | id), long)
+summary(mod.2f)
+
+mod.2 <- lmer(er.avoid ~ 1 + day0 + (1 + day0| id), long)
+summary(mod.2)
+sjp.lmer(mod.2, facet.grid = F, sort = "sort.all")
+```
+# On average, avoidance as an emotion regulation strategy doesn't significantly vary with time. However, when random effects are taking into account, the fixed effect is now significant with a standard deviation of 0.03, indicating individual differences around the average effect. 
+
+# When we include a random effect of time in addition to a random effect of the intercept, the random and fixed effects of the intercept slightly increase. 
+
+# Interpreting time: For every day, there is a quarter decrease in the likert rating for the outcome of avoidance, on average. However, there is a standard deviation of .03 (larger than the fixed effect).
+
+Problem 6
+# Create a density plot of random effects
+```{r}
+ggplot(x, aes(x = randeffects)) + 
+  geom_histogram(binwidth = .2, colour = "black", 
+                 fill = "sienna2", alpha = .5) + xlim(0, 1) +
+                                              
+#Include a density curve
+  stat_function(fun = function(x, mean, sd, bw) {
+    dnorm(x = x, mean = mean, sd = sd) * 10000 * bw },
+          args = c(mean = mean(), sd = sd(x$Heads5), 
+              bw = 0.2), color = "black", size = 1) +
+  labs(list(title = "Binomial Distribution Simulation: Five Coin Flips", 
+            x = "\nProportion of Heads", 
+            y = "Count\n"))
+```
+
+Problem 7
+#Create a catepilar plot of the random effects. Is there any person that seems odd in terms of a large standard errors around intercept and slope estimates?
+```{r}
+FEsim(mod.2)
+re.sim <- REsim(mod.2)
+```
+
+
+Problem 8
+# Create a plot of the trajectory, along with a spaghetti plot of each person’s individual slope. Set the alpha level (transparency) on the individual slopes to make them easier to see.
+
+Problem 9
+# Create a plot of the trajectory, along with a spagehtti plot of each person’s individual slope. Set the alpha level (transperancy) on the individual slopes to make them easier to see.
+
+
