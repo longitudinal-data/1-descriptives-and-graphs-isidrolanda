@@ -1,0 +1,295 @@
+---
+title: "Landa-Intensive Longitudinal Data Analysis"
+author: "Isidro Landa"
+date: "September 28, 2017"
+output: pdf_document
+---
+
+# Load packages
+```{r}
+rm(list=ls())
+
+library(haven)
+library(tidyverse)
+library(magrittr)
+library(ggplot2)
+library(lme4)
+library(psych)
+library(reghelper)
+```
+
+
+# Load data
+```{r, echo = FALSE}
+## Set working directory
+#setwd("C:/Users/Isidro/OneDrive/WUSTL/Coursework/F17/ALDA/Assignments/1-descriptives-and-graphs-isidrolanda")
+setwd("Z:/Lab/Lab Members/Isidro/Assignments/")
+
+
+erdata <- read_sav("Landa-CC daily diary.sav")
+post <- read_sav("Campus Culture-Post malone.sav") 
+
+
+erdata <- merge(erdata, post, all.x = T, by = "id") 
+  # Merge time-invariant variables from post-survey
+erdata %<>% arrange(id, day) 
+erdata[is.na(erdata)] <- NA 
+  # Imported data had NaNs, but only is.na worked, not is.nan
+```
+
+
+# Insert rows for missing time points (if needed)
+## This makes it possible to test lagged effects
+```{r}
+# CC_new_rows <- tbl_df(expand.grid(unique(day$id), seq(1, 7, 1)) %>%
+#             rename(id = Var1, day = Var2) %>%  
+#               full_join(day))
+#   # tbl_df (or can use 'as_tibble') creates a new data frame 
+# 
+# erdata <- arrange(CC_new_rows, id, day)
+```
+
+
+# Model 1: "New place" maladjustment moderators of the association 
+# between rumination and homesickness: Academic or Social?
+
+## Graphs
+```{r}
+# Raw fluctuation in homesickness
+ggplot(erdata, aes(day, e.homesick, group = id)) + geom_line() + 
+  geom_point() + facet_wrap(~id) + 
+  xlab("Time (Days 1-7)") + ylab("Homesickness") + 
+  ggtitle("Figure 1. Homesickness as a Function of Day") +
+  theme_classic() +
+  theme(legend.position = "none",
+          axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), 
+                                    hjust = .5))
+
+
+# Spaghetti plot with average growth trajectory
+erdata %>%
+  ggplot(aes(x = day, y = e.homesick)) + 
+    geom_smooth(aes(group = id), method = "lm", se = F, color = "gray", size = .2) +
+    geom_smooth(method = "lm", se = F, color = "red", size = 1) +
+    labs(x = "Day", y = "Homesickness", title = "Figure 2. Growth Curve") +
+    ylim(1, 5) +
+    theme_classic() +
+    theme(legend.position = "none",
+          axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .06))
+
+
+# Different color for each participant
+
+# erdata %>% 
+#  ggplot(erdata, aes(day, er.rumin, group = id)) +
+#   geom_point() + stat_smooth(method = "lm", se = F) +
+#   aes(color = factor(id)) + guides(color = F) +
+#     # Coloured by participant
+#   theme_classic() + 
+#   xlab("Day") + ylab("Emotion Regulation-Rumination") + ylim(1, 5) +
+#   ggtitle("Rumination as a Function of Day")
+
+```
+
+
+# Creating new vars (moderators)
+```{r}
+
+# Create belonging uncertainty (BUN) and academic functioning (acad.fx) composites
+erdata %<>% mutate(bun_m = bun1 + bun2 / 2, 
+                   acadfx = acad.lost + acad.procrast + acad.uncertain +
+                     acad.perform.r / 4)
+
+# Belonging Uncertainty (bun)
+  # bun1 - Sometimes I feel that I belong at Wash U, 
+      # and sometimes I feel that I don't belong at Wash U
+  # bun3 - When something bad happens, 
+      # I feel that maybe I don't belong at Wash U
+
+# Academic Functioning (acadfx)
+  # acad.lost - How lost did you feel in your assignments?
+  # acad.procrast - How much did you procrastinate on your assingments?
+  # acad.uncertain - How uncertain did you feel of where your academic 
+      # future/career was headed?
+  # acad.perform - How satisfied were you with your academic performance?
+
+
+# Correlations/internal consistency among items
+
+# acad_df <- erdata %>% select(acad.procrast:acad.perform)
+# keys = c(1, 1, 1, -1)
+# psych::alpha(x = acad_df, keys = keys)
+  # alpha = 0.68
+# bun_df <- erdata %>% select(bun1, bun3)
+# correlate(bun_df)
+  # r = 0.69
+
+erdata$suppress <- 6 - erdata$suppress
+# Suppress
+  # In general, how much did you try to keep your emotions to yourself during these
+    #face-to-face interactions today?
+
+erdata %<>% mutate(neg.m = (e.nerv + e.fear + e.hostile + e.guilty + e.shame + 
+                     e.slug + e.sleepy) / 7)
+
+```
+
+
+# Rescaling
+```{r}
+# Make time interpretable making zero day 1
+# erdata$day0 <- erdata$day - 1
+
+# Person-centering (mostly)
+# Calculate them within a seperate df
+erdata_agg <- erdata %>% group_by(id) %>%
+  summarize(er.rumin_agg = mean(er.rumin, na.rm = T),
+            e.homesick_agg = mean(e.homesick, na.rm = T),
+            suppress_agg = mean(suppress, na.rm = T)) 
+  # Get aggregate/person- or group-centered scores; 
+    #i.e., Mean for each person across their respective time points
+
+erdata <- merge(erdata, erdata_agg, all.x = T, by = "id")
+erdata %<>% mutate(er.rumin_pc = er.rumin - er.rumin_agg,
+                   e.homesick_pc = e.homesick - e.homesick_agg,
+                   suppress_pc = suppress - suppress_agg,
+                   bun_gm = bun_m - mean(bun_m, na.rm = T),
+                   acadfx_gm = acadfx - mean(acadfx, na.rm = T))
+  # Subtract person's mean from their raw score to get person-centered 
+  # For bun_gm we grand mean center because this is a time-invariant var
+
+# all(erdata$er.rumin == erdata$er.rumin_pc + erdata$er.rumin_agg, na.rm = T) 
+  # Check calculations; should get 'TRUE' if done correctly
+
+```
+
+
+# Modeling with a time-varying predictor
+```{r}
+# Unconditional means model (i.e., intercept and time only)
+mod1a <- lmer(e.homesick ~ day0 + (1 | id), erdata)
+summary(mod1a)
+  # Intercept: Mean of homesickness when day = 0 (i.e., day 1)
+  # Day: NS; but would be interpreted as an increase in homesickness each day
+
+ICC(mod1a) # Plenty of within-person variance but slightly more bw-person
+
+# Uncentered rumination predictor
+mod1b <- lmer(e.homesick ~ day0 + er.rumin + (1 | id), erdata)
+summary(mod1b)
+  # Intercept: Mean of homesickness when day = 0, controlling for rumination levels
+  # Rumination: For every 1-unit increase in rumination, there is the between effect 
+    # 0.08 increase in homesickness 
+
+# Add person-centered rumination instead
+mod1c <- lmer(e.homesick ~ day0 + er.rumin_pc + (1 | id), erdata)
+summary(mod1c)
+  # Intercept: Similar; slightly larger when controlling for within rumination effect
+  # Rumination: Similar; Now, the CONCURRENT association with homesickness due to 
+  # person-centering
+    # On days that rumination goes up, homesickness does too (not by much; 0.06)
+
+```
+
+
+# Examining predictions from week to week
+## For example, does Rumination on day one predict Homesickness on day two,
+## controlling for Homesickness on day one, and so forth.
+```{r, echo = FALSE}
+library(DataCombine) # To use 'slide()' function
+
+# Here we will create a lagged variable for homesickness such that
+# it's values will be shifted downward by one day.
+
+# Create a time-lagged varaible for homesickness
+erdata %<>% arrange(id, day)
+erdata_lagg <- slide(erdata, Var = "e.homesick", GroupVar = "id", slideBy = -1)
+  # Can slide by other values if theoretically meaningful
+
+  ## Copy over NAs from original homesick into new lagged homesick var
+  erdata_lagg %<>% mutate(next_home = ifelse(is.na(e.homesick), e.homesick,
+                                             `e.homesick-1`))
+  erdata$next_home <- as.numeric(erdata_lagg$next_home) 
+    # Ensure they're sorted the same first & add to original dataset
+  
+  # Rationale: When data is shifted downward, 
+  # actual values shift into cells (i.e., weeks) that were originally missing; 
+  # we don't want to predict values for days they missed
+  
+ erdata %<>% select(next_home, everything()) # Move lagged var to the front
+  
+ 
+
+ # Create a time-lagged varaible for negative affect
+erdata %<>% arrange(id, day)
+erdata_lagg2 <- slide(erdata, Var = "neg.m", GroupVar = "id", slideBy = -1)
+
+  ## Copy over NAs from original homesick into new lagged homesick var
+  erdata_lagg2 %<>% mutate(next_neg = ifelse(is.na(neg.m), neg.m,
+                                             `neg.m-1`))
+  erdata$next_neg <- as.numeric(erdata_lagg2$next_neg) 
+    # Ensure they're sorted the same first & add to original dataset
+  
+  # Rationale: When data is shifted downward, 
+  # actual values shift into cells (i.e., weeks) that were originally missing; 
+  # we don't want to predict values for days they missed
+  
+ erdata %<>% select(next_neg, neg.m, everything()) # Move lagged var to the front
+  
+```
+
+
+# Model 1b - Time-lagged models with time-invariant predictors
+```{r}
+# Does rumination predict homesickness controlling for previous day homesickness?
+mod2a <- lmer(next_home ~ day0 + e.homesick_pc + er.rumin_pc + (1 | id), erdata)
+summary(mod2a)
+  # No
+  # Homesickness: has sizable variation around random effect
+  # Rumination: has sizable variation around random effect
+
+# Does this change with the introduction of a time-invariant predictor?
+mod2b <- lmer(next_home ~ day0 + e.homesick_pc + er.rumin_pc*bun_gm +
+                (1 | id), erdata)
+summary(mod2b)
+  # No cross-level interaction 
+
+mod2c <- lmer(next_home ~ day0 + e.homesick_pc + er.rumin_pc*acadfx_gm +
+                (1 + e.homesick_pc + er.rumin_pc | id), erdata)
+summary(mod2c)
+  # No cross-level interaction 
+
+# Can informally check autocorrelation for homesickness by correlating orginal and lagged var
+mod2 <- lmer(next_home ~ e.homesick + (1 | id), erdata)
+summary(mod2)
+```
+
+
+# Does homesickness predict anxiety? Is this stronger for those high in suppression?
+```{r}
+
+
+mod3 <- lmer(neg.m ~ day0 + e.homesick_pc + (1 + day0 + e.homesick_pc | id), erdata)
+summary(mod3)
+  # Day: Negative affect decreases by -0.04 each day
+  # Homesickness: On days that homesickness increases, negative affect does too
+    # By 0.14, t = 5.36
+  # There is decent amount of variation around random effects, but fixed dont change
+
+mod3b <- lmer(neg.m ~ day0 + e.homesick_pc + suppress_pc + (1 | id), erdata)
+summary(mod3b)
+  # Suppress: Counterintuitively, negative affect actually decreases on days that
+    # suppression increases (-0.12, t = -5.09)
+
+mod3c <- lmer(next_neg ~ day0 + e.homesick_pc*suppress_pc + (1 | id), erdata)
+summary(mod3c)
+  # Main effects or interactions no longer significant; model saturated? Small N?
+ 
+```
+
+
+
