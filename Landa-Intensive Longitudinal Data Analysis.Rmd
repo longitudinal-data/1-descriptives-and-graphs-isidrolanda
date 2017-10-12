@@ -84,6 +84,11 @@ column_spec(2, width = "30em")
 #   # tbl_df (or can use 'as_tibble') creates a new data frame 
 # 
 # erdata <- arrange(CC_new_rows, id, day)
+
+# erdata_min <- erdata %>% 
+#   group_by(id) %>% 
+#   tally() %>% 
+#    filter(n >= 3)
 ```
 
 
@@ -229,10 +234,14 @@ summary(mod1c)
 erdata %<>% mutate(home_prev = lag(e.homesick),
                    rumin_prev = lag(er.rumin),
                    homepc_prev = lag(e.homesick_pc),
-                   ruminpc_prev = lag(er.rumin_pc)) %>%
+                   ruminpc_prev = lag(er.rumin_pc),
+                   homepc2_prev = lag(e.homesick_pc, n = 2),
+                   ruminpc2_prev = lag(er.rumin_pc, n = 2)) %>%
   select(er.rumin, rumin_prev, id, day, e.homesick, home_prev, everything())
 erdata$ruminpc_prev[erdata$day == 1] <- NA
 erdata$homepc_prev[erdata$day == 1] <- NA
+erdata$ruminpc2_prev[erdata$day == 1] <- NA
+erdata$homepc2_prev[erdata$day == 1] <- NA
   
 ```
 
@@ -243,6 +252,20 @@ erdata$homepc_prev[erdata$day == 1] <- NA
 mod2a <- lmer(e.homesick ~ day0 + homepc_prev + ruminpc_prev + (1 | id), erdata)
 summary(mod2a)
   # No
+
+# What about including both between- and person-centering
+mod2ab <- lmer(e.homesick ~ day0 + homepc_prev + ruminpc_prev + er.rumin_agg + (1 + ruminpc_prev | id), erdata)
+summary(mod2ab)
+ # Rumin: On days that people ruminate, the next day homesickness goes up, controlling for average rumination (rumin_agg).
+
+# Correlation between bw and pc rumination
+mod2ac <- lmer(er.rumin ~  er.rumin_agg+ (1 | id), erdata)
+summary(mod2ac)
+# Increase iterations
+
+# Maybe it predicts homesickness two days later
+mod2aa <- lmer(e.homesick ~ day0 + homepc2_prev + ruminpc2_prev + (1 | id), erdata)
+summary(mod2aa)
 
 # Only when you account for individual differences in growth curves 
 # is it that you get lagged effects
@@ -266,4 +289,6 @@ summary(mod2d)
 
 ## Potential conclusions:
 ### Perhaps it's a combination of having slightly more between-person variance and the time-scale (daily vs weekly). Homesickness seems to have more variability on a weekly time-scale (ICC = .43). Despite ML estimation, it could also be the small sample size. There were N = 150 for daily portion and N = 135 for analyses including time-invariant variables. Also, rumination seems to have a large between effect. 
+
+## One major confound is the different years. Most are freshmen and sophmore, but there are also juniors and seniors.
 
