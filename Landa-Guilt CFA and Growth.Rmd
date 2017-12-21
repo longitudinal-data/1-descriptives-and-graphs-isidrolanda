@@ -1,0 +1,687 @@
+---
+title: "CFA of Family Achievement Guilt"
+author: "Isidro Landa"
+date: "October 24, 2017"
+output: pdf_document
+---
+
+# Set up the workspace
+```{r}
+rm(list = ls(all = T)) 
+
+# Packages used
+library(tidyverse)
+library(haven)
+library(kableExtra)
+library(knitr)
+library(magrittr)
+library(psych)
+library(lavaan)
+library(semPlot)
+
+
+# Set working directory
+setwd("C:/Users/Isidro/OneDrive/Research/Sally Casanova Summer Research 2016/Data Analyses/Data")
+
+
+# Data 
+g <- read_sav("Fam Roles Pre-Post Merged-Relabeled.sav")
+g %<>% arrange(PID)
+
+```
+
+# Study variables
+```{r}
+# Table 1: Dependent Variables
+guilt_items <- data.frame(
+
+Variable = c("g15_privilege_freedom",  "g18_privilege_betterlife", "g14_privilege_struggling", "g19_privilege_prettygood", "g32_abandon_abandonhomeresponsibilities", "g26_abandon_abandon", "g17_priviledge_betterthings", "g13_privilege_sadopportunities", "g23_abandon_worry", "g6_selffocus_selfish", "g21_privilege_angryaccess",  "g7_selffocus_problems", "g56_notexposed", "g44_frustration_canttalk", "g46_frustrated_dontunderstand", "g47_different_changingnow", "g48_different_driftedaway", "g49_different_changingme", "g10_superiority_feelbad", "g11_superiority_toogood", "g33_burden_collegexpenseburden", "g34_burden_payexpense", "g35_burden_sacrifices", "g1_famfail_letfamdown", "g3_famfail_famexpect", "g4_famfail_invest"),
+Items = c(
+"It's unfair that I have more freedom in college than my family members have at home",
+"I feel bad that I am living a better life in college than my family is at home",
+"I feel guilty when my family is at home struggling while I'm in college enjoying myself",
+"It makes me feel bad that I have it pretty good in college while my family struggles back home",
+"I feel bad or guilty for abandoning my responsibilities at home", "I feel bad for abandoning my family to attend college", "I feel sad that I am moving on up to better things while my family is not", "I feel sad that my family cannot experience the opportunities that I have in college", "I worry about my family back home since I am not there anymore", "I feel selfish for focusing on myself at school", "It makes me angry that my family doesn't have access to the same kind of opportunities that I do", "I feel bad for focusing on school when there are problems at home", "I feel sad that my family is not exposed to the things I'm learning about college", "It's frustrating that I can't really talk to family about school", "I get frustrated when my family doesn't seem to understand my college experiences", "I feel guilty when my family thinks that I'm changing now that I'm in college", "I feel bad that I have drifted away from family because of having different goals in life", "I feel bad because my family may think that college is changing me.", "Family members sometimes make me feel bad about the opportunities I have in college", "I worry that my family thinks I am too good for them or smarter than them", "I feel bad that my college expense is a burden to my family", "I feel guilty when my family has to pay my college expenses", "I feel bad because going to college means many financial sacrifices from my family", "I feel pressured to do well so as to not let my family down", "I worry that I won't be able to meet my family's expectations", "I worry that I won't be able to repay my family for their investment in me"),
+Scale = c("0 (Not true/Doesn't apply), 1 (Rarely true), 2 (Sometimes true), 3 (Usually true), 4 (Almost always true)", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "")
+)
+
+kable(guilt_items, format = "latex", booktabs = T, caption = "Guilt Items") %>%
+kable_styling(full_width = F, latex_options = c("striped", "scale_down")) %>%
+column_spec(1, bold = T) %>%
+column_spec(2, width = "20em")
+```
+
+# 1) Initial measurement model and scaling
+
+# 1. Specify the Model
+  - Reflective latent factors (vs. Formative). That is, the latent factors theoretically cause the manifest/observable guilt-related items.
+```{r}
+mod_initial <-   ' privilege =~ g15_privilege_freedom +
+                        g18_privilege_betterlife + 
+                        g14_privilege_struggling + 
+                        g19_privilege_prettygood +
+                        g32_abandon_abandonhomeresponsibilities + 
+                        g26_abandon_abandon + 
+                        g17_priviledge_betterthings + 
+                        g13_privilege_sadopportunities +
+                        g23_abandon_worry + g6_selffocus_selfish +
+                        g21_privilege_angryaccess + 
+                        g7_selffocus_problems + g56_notexposed
+
+          different =~ g44_frustration_canttalk + 
+                       g46_frustrated_dontunderstand +
+                       g47_different_changingnow + 
+                       g48_different_driftedaway + 
+                       g49_different_changingme + 
+                       g10_superiority_feelbad +
+                       g11_superiority_toogood +
+                       g12_superiority_allthat
+
+          pressures =~ g33_burden_collegexpenseburden + 
+                       g34_burden_payexpense + 
+                       g35_burden_sacrifices + 
+                       g3_famfail_famexpect + 
+                       g4_famfail_invest + 
+g1_famfail_letfamdown
+
+privilege ~~ different
+different ~~ pressures
+privilege ~~ pressures
+
+'
+
+# By default, lavaan will use the first indicator variable to scale    
+  # the latent factor; this is reasonable given that the first
+  # indicator variable here is the most representative of each factor
+  # That is, it had the highest factor loading during previous EFA
+# This will constrain the first indicator variable to 1 and control 
+  # degrees of freedom bc first indicators are not estimated
+
+```
+
+# 2. Fit the Model
+```{r}
+fit_initial <- cfa(mod_initial, data = g, missing = "ML")
+
+```
+
+# 3. Model output
+
+## Fit is poor!
+
+## Interpretations of each section
+  - Fit Indices:
+    - CFI & TLI: Distance from worst fit (i.e., null model) is < .90 
+    - RMSEA & SRMR: Distances from perfect fit is > .08 
+  - Latent Variables:
+    - Factor loadings seem more or less reasonable; only two items between .3 and .5  
+  - Covariances: "Std.all" are basically correlations (0.35 - 0.48) among our factors
+  - Variances
+    - One of the variables above with low factor loading also has a lot of residual variance (i.e., g1)
+```{r}
+summary(fit_initial, standardized = T, fit.measures = T, rsq = T)
+
+# CIs for unstandardized estimates
+# parameterestimates(fit1, standardized = T) 
+
+```
+
+
+# 4. Adjust the Model (Modification Indices)
+  - Removed items:
+    - 1) g56__notexposed: Modification indices suggested a cross-loading onto DIFFERENT in addition to PRIVILEGE
+    - 2) g1: Low factor loading (~ 0.3), lowest R-square, high unique residual
+      - Removed g56 & g1 altogether and reran modification indices for the suggested changes below
+```{r}
+mod1 <-   ' privilege =~ g15_privilege_freedom +
+                        g18_privilege_betterlife + 
+                        g14_privilege_struggling + 
+                        g19_privilege_prettygood +
+                        g32_abandon_abandonhomeresponsibilities + 
+                        g26_abandon_abandon + 
+                        g17_priviledge_betterthings + 
+                        g13_privilege_sadopportunities +
+                        g23_abandon_worry + g6_selffocus_selfish +
+                        g21_privilege_angryaccess + 
+                        g7_selffocus_problems
+
+          different =~ g44_frustration_canttalk + 
+                       g46_frustrated_dontunderstand +
+                       g47_different_changingnow + 
+                       g48_different_driftedaway + 
+                       g49_different_changingme + 
+                       g10_superiority_feelbad +
+                       g11_superiority_toogood +
+                       g12_superiority_allthat
+
+          pressures =~ g33_burden_collegexpenseburden + 
+                       g34_burden_payexpense + 
+                       g35_burden_sacrifices + 
+                       g3_famfail_famexpect + 
+                       g4_famfail_invest
+
+privilege ~~ different
+different ~~ pressures
+privilege ~~ pressures
+
+'
+
+fit1 <- cfa(mod_initial, data = g)
+
+summary(fit1, standardized = T, fit.measures = T, rsq = T)
+
+# Improving the model
+modificationindices(fit1, sort. = T, minimum.value = 10.00)
+
+# Not sig better if you only remove g56 and g1
+anova(fit_initial, fit1)
+
+```
+
+
+## More modifications: Correlating residuals within factors (top modification suggestions)
+```{r}
+
+mod2 <-   ' privilege =~ g15_privilege_freedom +
+                        g18_privilege_betterlife + 
+                        g14_privilege_struggling + 
+                        g19_privilege_prettygood +
+                        g32_abandon_abandonhomeresponsibilities + 
+                        g26_abandon_abandon + 
+                        g17_priviledge_betterthings + 
+                        g13_privilege_sadopportunities +
+                        g23_abandon_worry + g6_selffocus_selfish +
+                        g21_privilege_angryaccess + 
+                        g7_selffocus_problems 
+
+          different =~ g44_frustration_canttalk + 
+                       g46_frustrated_dontunderstand +
+                       g47_different_changingnow + 
+                       g48_different_driftedaway + 
+                       g49_different_changingme + 
+                       g10_superiority_feelbad +
+                       g11_superiority_toogood +
+                       g12_superiority_allthat
+
+          pressures =~ g33_burden_collegexpenseburden + 
+                       g34_burden_payexpense + 
+                       g35_burden_sacrifices +
+                       g3_famfail_famexpect + g4_famfail_invest
+
+privilege ~~ different
+different ~~ pressures
+privilege ~~ pressures
+
+g47_different_changingnow ~~ g49_different_changingme
+g13_privilege_sadopportunities ~~ g21_privilege_angryaccess
+g44_frustration_canttalk ~~  g46_frustrated_dontunderstand
+g32_abandon_abandonhomeresponsibilities ~~ g26_abandon_abandon
+g17_priviledge_betterthings ~~ g21_privilege_angryaccess
+g11_superiority_toogood ~~ g12_superiority_allthat
+g46_frustrated_dontunderstand ~~  g10_superiority_feelbad
+g3_famfail_famexpect ~~ g4_famfail_invest
+
+'
+fit2 <- cfa(mod2, data = g)
+summary(fit2, standardized = T, fit.measures = T, rsq = T)
+
+modificationindices(fit2, sort. = T, minimum.value = 10.00)
+
+# Much better
+# Model 2 has lower AIC, BIC values
+anova(fit1, fit2)
+```
+
+
+d# 5. Plot the model
+  - Values are all standardized
+```{r, warning = FALSE, messageg = FLASE}
+semPaths(fit2, "est", whatLabels = "std")
+
+```
+
+# 2) Measurement model fit
+## Fit statistics suggest its an acceptable model fit. The CFI and TLI which are above 0.90 suggest our model is better than the worst model (i.e., null model); the RMSEA and SRMR--both under 0.08-- suggest that comparable to the perfect model, our model has acceptable fit. Since there are still several associations that can be specified (as suggested by the modification indices), our model is under-identified. Further, the fit decreases when looking at specific sub-groups (e.g., Males, CGS)
+
+# 3) Associations between LVs across time
+
+# Fit a longitudinal LV model where a) latent factors are correlated across time and b) a second model that predicts later times by a previous time (i.e., autoregressive; t1 -> t2 -> t3). What are the conclusions? How does one differ from the other?
+## Correlations from LV model
+  - Privilege & privilege_T2: 0.91
+  - Different & different_T2: 0.90
+  - Pressures & pressures_T2: 0.84
+## Regression coefficients
+  - Privilege & privilege_T2: 0.99
+  - Different & different_T2: 0.85
+  - Pressures & pressures_T2: 0.81
+## Conclusions
+  - The results aren't too different. They are all highly associated. 
+```{r}
+mod3 <-   ' privilege =~ g15_privilege_freedom +
+                        g18_privilege_betterlife + 
+                        g14_privilege_struggling + 
+                        g19_privilege_prettygood +
+                        g32_abandon_abandonhomeresponsibilities + 
+                        g26_abandon_abandon + 
+                        g17_priviledge_betterthings + 
+                        g13_privilege_sadopportunities +
+                        g23_abandon_worry + g6_selffocus_selfish +
+                        g21_privilege_angryaccess + 
+                        g7_selffocus_problems
+
+          different =~ g44_frustration_canttalk + 
+                       g46_frustrated_dontunderstand +
+                       g47_different_changingnow + 
+                       g48_different_driftedaway + 
+                       g49_different_changingme + 
+                       g10_superiority_feelbad +
+                       g11_superiority_toogood
+
+          pressures =~ g33_burden_collegexpenseburden + 
+                       g34_burden_payexpense + 
+                       g35_burden_sacrifices + 
+                       g3_famfail_famexpect + 
+                       g4_famfail_invest 
+
+          privilege_T2 =~ g15_privilege_freedom_T2 +
+                       g18_privilege_betterlife_T2 +
+                       g14_privilege_struggling_T2 +
+                       g19_privilege_prettygood_T2 +
+                       g32_abandon_abandonhomeresponsibilities_T2 +
+                       g26_abandon_abandon_T2 +
+                       g17_priviledge_betterthings_T2 +
+                       g13_privilege_sadopportunities_T2 +
+                       g23_abandon_worry_T2 +
+                       g6_selffocus_selfish_T2 +
+                       g21_privilege_angryaccess_T2 +
+                       g7_selffocus_problems_T2
+
+          different_T2 =~ g44_frustration_canttalk_T2 +
+                       g46_frustrated_dontunderstand_T2 +
+                       g47_different_changingnow_T2 +
+                       g48_different_driftedaway_T2 +
+                       g49_different_changingme_T2 +
+                       g10_superiority_feelbad_T2 +
+                       g11_superiority_toogood_T2
+
+          pressures_T2 =~ g33_burden_collegexpenseburden_T2 +
+                       g34_burden_payexpense_T2 +
+                       g35_burden_sacrifices_T2 +
+                       g3_famfail_famexpect_T2 +
+                       g4_famfail_invest_T2
+
+          privilege ~~ different
+          different ~~ pressures
+          privilege ~~ pressures
+          
+          privilege_T2 ~~ different_T2
+          different_T2 ~~ pressures_T2
+          privilege_T2 ~~ pressures_T2
+
+          privilege ~~ privilege_T2
+          different ~~ different_T2
+          pressures ~~ pressures_T2
+
+g47_different_changingnow ~~ g49_different_changingme
+g13_privilege_sadopportunities ~~ g21_privilege_angryaccess
+g44_frustration_canttalk ~~  g46_frustrated_dontunderstand
+g32_abandon_abandonhomeresponsibilities ~~ g26_abandon_abandon
+g17_priviledge_betterthings ~~ g21_privilege_angryaccess
+g11_superiority_toogood ~~ g12_superiority_allthat
+g46_frustrated_dontunderstand ~~ g10_superiority_feelbad
+g3_famfail_famexpect ~~ g4_famfail_invest
+
+g47_different_changingnow_T2 ~~ g49_different_changingme_T2
+g13_privilege_sadopportunities_T2 ~~ g21_privilege_angryaccess_T2
+g44_frustration_canttalk_T2 ~~  g46_frustrated_dontunderstand_T2
+g32_abandon_abandonhomeresponsibilities_T2 ~~ g26_abandon_abandon_T2
+g17_priviledge_betterthings_T2 ~~ g21_privilege_angryaccess_T2
+g11_superiority_toogood_T2 ~~ g12_superiority_allthat_T2
+g46_frustrated_dontunderstand_T2 ~~ g10_superiority_feelbad_T2
+g3_famfail_famexpect_T2 ~~ g4_famfail_invest_T2
+
+'
+
+fit3 <- cfa(mod3, data = g, missing = "ML")
+summary(fit3, standardized = T, fit.measures = T, rsq = T)
+
+
+# Autoreggressive model
+mod4 <-   ' privilege =~ g15_privilege_freedom +
+                        g18_privilege_betterlife + 
+                        g14_privilege_struggling + 
+                        g19_privilege_prettygood +
+                        g32_abandon_abandonhomeresponsibilities + 
+                        g26_abandon_abandon + 
+                        g17_priviledge_betterthings + 
+                        g13_privilege_sadopportunities +
+                        g23_abandon_worry + g6_selffocus_selfish +
+                        g21_privilege_angryaccess + 
+                        g7_selffocus_problems
+
+          different =~ g44_frustration_canttalk + 
+                       g46_frustrated_dontunderstand +
+                       g47_different_changingnow + 
+                       g48_different_driftedaway + 
+                       g49_different_changingme + 
+                       g10_superiority_feelbad +
+                       g11_superiority_toogood
+
+          pressures =~ g33_burden_collegexpenseburden + 
+                       g34_burden_payexpense + 
+                       g35_burden_sacrifices + 
+                       g3_famfail_famexpect + 
+                       g4_famfail_invest 
+
+          privilege_T2 =~ g15_privilege_freedom_T2 +
+                       g18_privilege_betterlife_T2 +
+                       g14_privilege_struggling_T2 +
+                       g19_privilege_prettygood_T2 +
+                       g32_abandon_abandonhomeresponsibilities_T2 +
+                       g26_abandon_abandon_T2 +
+                       g17_priviledge_betterthings_T2 +
+                       g13_privilege_sadopportunities_T2 +
+                       g23_abandon_worry_T2 +
+                       g6_selffocus_selfish_T2 +
+                       g21_privilege_angryaccess_T2 +
+                       g7_selffocus_problems_T2
+
+          different_T2 =~ g44_frustration_canttalk_T2 +
+                       g46_frustrated_dontunderstand_T2 +
+                       g47_different_changingnow_T2 +
+                       g48_different_driftedaway_T2 +
+                       g49_different_changingme_T2 +
+                       g10_superiority_feelbad_T2 +
+                       g11_superiority_toogood_T2
+
+          pressures_T2 =~ g33_burden_collegexpenseburden_T2 +
+                       g34_burden_payexpense_T2 +
+                       g35_burden_sacrifices_T2 +
+                       g3_famfail_famexpect_T2 +
+                       g4_famfail_invest_T2
+
+          privilege ~~ different
+          different ~~ pressures
+          privilege ~~ pressures
+          
+          privilege_T2 ~~ different_T2
+          different_T2 ~~ pressures_T2
+          privilege_T2 ~~ pressures_T2
+
+          privilege_T2 ~ privilege
+          different_T2 ~ different
+          pressures_T2 ~ pressures
+
+g47_different_changingnow ~~ g49_different_changingme
+g13_privilege_sadopportunities ~~ g21_privilege_angryaccess
+g44_frustration_canttalk ~~  g46_frustrated_dontunderstand
+g32_abandon_abandonhomeresponsibilities ~~ g26_abandon_abandon
+g17_priviledge_betterthings ~~ g21_privilege_angryaccess
+g11_superiority_toogood ~~ g12_superiority_allthat
+g46_frustrated_dontunderstand ~~ g10_superiority_feelbad
+g3_famfail_famexpect ~~ g4_famfail_invest
+
+g47_different_changingnow_T2 ~~ g49_different_changingme_T2
+g13_privilege_sadopportunities_T2 ~~ g21_privilege_angryaccess_T2
+g44_frustration_canttalk_T2 ~~  g46_frustrated_dontunderstand_T2
+g32_abandon_abandonhomeresponsibilities_T2 ~~ g26_abandon_abandon_T2
+g17_priviledge_betterthings_T2 ~~ g21_privilege_angryaccess_T2
+g11_superiority_toogood_T2 ~~ g12_superiority_allthat_T2
+g46_frustrated_dontunderstand_T2 ~~ g10_superiority_feelbad_T2
+g3_famfail_famexpect_T2 ~~ g4_famfail_invest_T2
+
+'
+
+fit4 <- cfa(mod4, data = g, missing = "ML")
+summary(fit4, standardized = T, fit.measures = T, rsq = T)
+```
+
+
+# 4) Longitudinal growth model (SEM vs HLM)
+
+```{r}
+sec.order <-   ' 
+# Constrained variance to be the same across two time points
+
+privilege =~ L1*g15_privilege_freedom +
+                        L2*g18_privilege_betterlife + 
+                        L3*g14_privilege_struggling + 
+                        L4*g19_privilege_prettygood +
+                        L5*g32_abandon_abandonhomeresponsibilities + 
+                        L6*g26_abandon_abandon + 
+                        L7*g17_priviledge_betterthings + 
+                        L8*g13_privilege_sadopportunities +
+                        L9*g23_abandon_worry + 
+                        L10*g6_selffocus_selfish +
+                        L11*g21_privilege_angryaccess + 
+                        L12*g7_selffocus_problems
+
+          different =~ L13*g44_frustration_canttalk + 
+                       L14*g46_frustrated_dontunderstand +
+                       L15*g47_different_changingnow + 
+                       L16*g48_different_driftedaway + 
+                       L17*g49_different_changingme + 
+                       L18*g10_superiority_feelbad +
+                       L19*g11_superiority_toogood
+
+          pressures =~ L20*g33_burden_collegexpenseburden + 
+                       L21*g34_burden_payexpense + 
+                       L22*g35_burden_sacrifices + 
+                       L23*g3_famfail_famexpect + 
+                       L24*g4_famfail_invest 
+
+          privilege_T2 =~ L1*g15_privilege_freedom_T2 +
+                       L2*g18_privilege_betterlife_T2 +
+                       L3*g14_privilege_struggling_T2 +
+                       L4*g19_privilege_prettygood_T2 +
+                          L5*g32_abandon_abandonhomeresponsibilities_T2 +
+                       L6*g26_abandon_abandon_T2 +
+                       L7*g17_priviledge_betterthings_T2 +
+                       L8*g13_privilege_sadopportunities_T2 +
+                       L9*g23_abandon_worry_T2 +
+                       L10*g6_selffocus_selfish_T2 +
+                       L11*g21_privilege_angryaccess_T2 +
+                       L12*g7_selffocus_problems_T2
+
+          different_T2 =~ L13*g44_frustration_canttalk_T2 +
+                       L14*g46_frustrated_dontunderstand_T2 +
+                       L15*g47_different_changingnow_T2 +
+                       L16*g48_different_driftedaway_T2 +
+                       L17*g49_different_changingme_T2 +
+                       L18*g10_superiority_feelbad_T2 +
+                       L19*g11_superiority_toogood_T2
+
+          pressures_T2 =~ L20*g33_burden_collegexpenseburden_T2 +
+                       L21*g34_burden_payexpense_T2 +
+                       L22*g35_burden_sacrifices_T2 +
+                       L23*g3_famfail_famexpect_T2 +
+                       L24*g4_famfail_invest_T2
+
+# Intercepts of indicators were also constrained to be the same across time
+
+# T1
+g15_priviege_freedom ~ t1*1
+g18_priviege_betterife ~ t2*1 
+g14_priviege_strugging ~ t3*1 
+g19_priviege_prettygood ~ t4*1
+g32_abandon_abandonhomeresponsibiities ~ t5*1 
+g26_abandon_abandon ~ t6*1 
+g17_priviedge_betterthings ~ t7*1 
+g13_priviege_sadopportunities ~ t8*1
+g23_abandon_worry ~ t9*1 
+g6_seffocus_sefish ~ t10*1
+g21_priviege_angryaccess ~ t11*1 
+g7_seffocus_probems ~ t12*1
+g44_frustration_canttak ~ t13*1 
+g46_frustrated_dontunderstand ~ t14*1
+g47_different_changingnow ~ t15*1 
+g48_different_driftedaway ~ t16*1 
+g49_different_changingme ~ t17*1 
+g10_superiority_feebad ~ t18*1
+g11_superiority_toogood ~ t19*1
+g33_burden_coegexpenseburden ~ t20*1 
+g34_burden_payexpense ~ t21*1 
+g35_burden_sacrifices ~ t22*1 
+g3_famfai_famexpect ~ t23*1 
+g4_famfai_invest ~ t24*1
+
+# T2
+g15_priviege_freedom_T2 ~  t1*1
+g18_priviege_betterife_T2 ~  t2*1 
+g14_priviege_strugging_T2 ~  t3*1 
+g19_priviege_prettygood_T2 ~  t4*1
+g32_abandon_abandonhomeresponsibiities_T2 ~  t5*1 
+g26_abandon_abandon_T2 ~  t6*1 
+g17_priviedge_betterthings_T2 ~  t7*1 
+g13_priviege_sadopportunities_T2 ~  t8*1
+g23_abandon_worry_T2 ~  t9*1 
+g6_seffocus_sefish_T2 ~  t10*1
+g21_priviege_angryaccess_T2 ~  t11*1 
+g7_seffocus_probems_T2 ~  t12*1
+g44_frustration_canttak_T2 ~  t13*1 
+g46_frustrated_dontunderstand_T2 ~  t14*1
+g47_different_changingnow_T2 ~  t15*1 
+g48_different_driftedaway_T2 ~  t16*1 
+g49_different_changingme_T2 ~  t17*1 
+g10_superiority_feebad_T2 ~  t18*1
+g11_superiority_toogood_T2 ~  t19*1
+g33_burden_coegexpenseburden_T2 ~  t20*1 
+g34_burden_payexpense_T2 ~  t21*1 
+g35_burden_sacrifices_T2 ~  t22*1 
+g3_famfai_famexpect_T2 ~  t23*1 
+g4_famfai_invest_T2 ~  t24*1
+
+
+# Correlated residuals across time
+
+# Constrain LV means
+
+# Model constraints for effects coding (?) and construct i and s
+
+          privilege ~~ different
+          different ~~ pressures
+          privilege ~~ pressures
+          
+          privilege_T2 ~~ different_T2
+          different_T2 ~~ pressures_T2
+          privilege_T2 ~~ pressures_T2
+
+          privilege_T2 ~ privilege
+          different_T2 ~ different
+          pressures_T2 ~ pressures
+
+g47_different_changingnow ~~ g49_different_changingme
+g13_privilege_sadopportunities ~~ g21_privilege_angryaccess
+g44_frustration_canttalk ~~  g46_frustrated_dontunderstand
+g32_abandon_abandonhomeresponsibilities ~~ g26_abandon_abandon
+g17_priviledge_betterthings ~~ g21_privilege_angryaccess
+g11_superiority_toogood ~~ g12_superiority_allthat
+g46_frustrated_dontunderstand ~~ g10_superiority_feelbad
+g3_famfail_famexpect ~~ g4_famfail_invest
+
+g47_different_changingnow_T2 ~~ g49_different_changingme_T2
+g13_privilege_sadopportunities_T2 ~~ g21_privilege_angryaccess_T2
+g44_frustration_canttalk_T2 ~~  g46_frustrated_dontunderstand_T2
+g32_abandon_abandonhomeresponsibilities_T2 ~~ g26_abandon_abandon_T2
+g17_priviledge_betterthings_T2 ~~ g21_privilege_angryaccess_T2
+g11_superiority_toogood_T2 ~~ g12_superiority_allthat_T2
+g46_frustrated_dontunderstand_T2 ~~ g10_superiority_feelbad_T2
+g3_famfail_famexpect_T2 ~~ g4_famfail_invest_T2
+
+'
+
+fit4 <- cfa(mod4, data = g, missing = "ML")
+summary(fit4, standardized = T, fit.measures = T, rsq = T)
+```
+
+
+# 5) Constraining residual variances
+
+```{r}
+
+```
+
+# 6) Constraining slope
+
+```{r}
+
+```
+
+
+# 7) Change SEM model time metric
+
+```{r}
+
+```
+
+# 8) Using different types of estimation
+
+```{r}
+
+```
+
+
+# 9) Semplots for each of the models
+
+```{r}
+semPaths(fit_initial, "est", whatLabels = "std")
+
+semPaths(fit1, "est", whatLabels = "std")
+
+semPaths(fit2, "est", whatLabels = "std")
+
+```
+
+
+# Test measurement invariance across time for your construct. Can you run growth models? If there is evidence of non-invariance, what seems to be the problem?
+```{r}
+# Baseline model
+config <- cfa(mod_initial, data = g)
+summary(config, standardized = T, fit.measures = T, rsq = T)
+
+# Weak invariance
+
+
+```
+
+# Fit a second order growth model. Compare and contrast the estimates with the normal latent growth model.
+```{r}
+
+```
+
+# Fit a series of multiple group models. Constrain some parameters and compare the fit.
+## Gender
+```{r}
+g2 <- g %>% filter(Gender != "3")
+
+fit3 <- cfa(mod2, data = g2, missing = "ML", group = "Gender")
+summary(fit3, standardized = T, fit.measures = T, rsq = T)
+
+# For separate model fit statistics
+# Female
+g3 <- g %>% filter(Gender != "3" & Gender != "2")
+fit4 <- cfa(mod2, data = g3, missing = "ML")
+summary(fit4, standardized = T, fit.measures = T, rsq = T)
+
+
+# Male
+g4 <- g %>% filter(Gender != "3" & Gender != "1")
+fit4 <- cfa(mod2, data = g4, missing = "ML")
+summary(fit4, standardized = T, fit.measures = T, rsq = T)
+```
+
+## First-generation college student status
+```{r}
+# First-gen
+g5 <- g %>% filter(FirstGen == "2")
+fit5 <- cfa(mod2, data = g5, missing = "ML")
+summary(fit5, standardized = T, fit.measures = T, rsq = T)
+
+# Continuiing-gen
+g6 <- g %>% filter(FirstGen == "1")
+fit6 <- cfa(mod2, data = g6, missing = "ML")
+summary(fit6, standardized = T, fit.measures = T, rsq = T)
+```
+
+ 
+
